@@ -1,0 +1,52 @@
+services:
+  db:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: odoo
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgresql_password
+      PGDATA: /var/lib/postgresql/18/docker
+    secrets:
+      - postgresql_password
+    volumes:
+      - ./volumesOdoo/dataPostgreSQL:/var/lib/postgresql
+    shm_size: 256mb
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U odoo -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - odoo_internal
+
+  web:
+    image: odoo:19.0
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8069:8069"
+    environment:
+      HOST: db
+      PORT: 5432
+      USER: odoo
+      PASSWORD_FILE: /run/secrets/postgresql_password
+    secrets:
+      - postgresql_password
+    volumes:
+      - ./volumesOdoo/odoo:/var/lib/odoo
+      - ./config/odoo.conf:/etc/odoo/odoo.conf:ro
+      - ./volumesOdoo/addons:/mnt/extra-addons:ro
+    networks:
+      - odoo_internal
+
+networks:
+  odoo_internal:
+    driver: bridge
+
+secrets:
+  postgresql_password:
+    file: ./secrets/postgres_password.txt
